@@ -19,6 +19,8 @@ Standard Options:
   --transform, -t  Use a transform module on top-level files.
  
     --command, -c  Use a transform command on top-level files.
+
+    --plugin,  -p  Use a plugin.
    
   --standalone -s  Generate a UMD bundle for the supplied export name.
                    This bundle works with other module systems and sets the name

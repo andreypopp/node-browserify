@@ -4,6 +4,9 @@ var spawn = require('child_process').spawn;
 var parseShell = require('shell-quote').parse;
 var duplexer = require('duplexer');
 var minimist = require('minimist');
+var resolve = require('resolve/lib/sync');
+
+var cwd = process.cwd();
 
 module.exports = function (args) {
     var argv = minimist(args, {
@@ -64,7 +67,26 @@ module.exports = function (args) {
         commondir: argv.commondir === false ? false : undefined
     });
     b.argv = argv;
-    
+
+    [].concat(argv.p).concat(argv.plugin).filter(Boolean)
+      .forEach(function(p) {
+        var name = p
+          .replace(/\.js$/, '')
+          .replace(/^[\/\.]+/, '')
+          .replace(/[\/\.]+/g, '-');
+
+        p = require(resolve(p, {basedir: cwd}));
+
+        var opts = {__name: name};
+        var prefix = name + '-';
+
+        for (var k in argv)
+          if (k.indexOf(prefix) === 0)
+            opts[k.slice(prefix.length)] = argv[k];
+
+        p(b, opts);
+      });
+
     [].concat(argv.i).concat(argv.ignore).filter(Boolean)
         .forEach(function (i) { b.ignore(i) })
     ;
