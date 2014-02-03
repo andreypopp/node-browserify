@@ -121,12 +121,22 @@ module.exports = function (args) {
         .filter(Boolean)
         .forEach(function (t) { b.transform(t) })
     ;
-    
+
     [].concat(argv.g).concat(argv['global-transform'])
         .filter(Boolean)
         .forEach(function (t) { b.transform({ global: true }, t) })
     ;
-    
+
+    [].concat(argv['dep-transform'])
+        .filter(Boolean)
+        .forEach(function (t) { b.depTransform(t) })
+    ;
+
+    [].concat(argv['bundle-transform'])
+        .filter(Boolean)
+        .forEach(function (t) { b.depTransform(t) })
+    ;
+
     [].concat(argv.c).concat(argv.command).filter(Boolean)
         .forEach(function (c) {
             var cmd = parseShell(c);

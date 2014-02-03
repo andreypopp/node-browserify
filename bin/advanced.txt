@@ -64,3 +64,11 @@ Advanced Options:
 
     Use a transform module on all files after any ordinary transforms have run.
 
+  --dep-transform
+
+    Use a module to transform stream of module dependencies.
+
+  --bundle-transform
+
+    Use a module to transform resulted bundle stream.
+
