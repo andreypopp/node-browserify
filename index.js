@@ -62,6 +62,9 @@ function Browserify (opts) {
     
     self._workflows = [];
     
+    self._bundleTransforms = [];
+    self._depTransforms = [];
+    
     self._transforms = [];
     self._globalTransforms = [];
     self._extensions = [ '.js', '.json' ]
@@ -111,6 +114,24 @@ Browserify.prototype.noParse = function(file) {
 
 Browserify.prototype.add = function (file) {
     this.require(file, { entry: true });
+    return this;
+};
+
+Browserify.prototype.bundleTransform = function (t) {
+    if (typeof t === 'string') {
+        var basedir = this._basedir || process.cwd();
+        t = require(resolveSync(t, {basedir: basedir}));
+    }
+    this._bundleTransforms.push(t);
+    return this;
+};
+
+Browserify.prototype.depTransform = function (t) {
+    if (typeof t === 'string') {
+        var basedir = this._basedir || process.cwd();
+        t = require(resolveSync(t, {basedir: basedir}));
+    }
+    this._depTransforms.push(t);
     return this;
 };
 
@@ -295,11 +316,16 @@ Browserify.prototype.bundle = function (opts, cb) {
         });
     }
 
+    var bundleTransforms = [];
+    opts.depTransforms = [];
+
     var apis = self._workflows.map(function(w) {
       var api = new Workflow();
       w.workflow(api, w.opts, opts);
       opts.transform = opts.transform.concat(api._transforms);
       opts.globalTransform = opts.globalTransform.concat(api._globalTransforms);
+      opts.depTransforms = opts.depTransforms.concat(api._depTransforms);
+      bundleTransforms = bundleTransforms.concat(api._bundleTransforms);
       return api;
     });
     
@@ -330,6 +356,12 @@ Browserify.prototype.bundle = function (opts, cb) {
         }));
         return output;
     }
+
+
+    if (self._bundleTransforms.length > 0 || bundleTransforms.length > 0) {
+      p = applyTransforms(p, [].concat(self._bundleTransforms).concat(bundleTransforms));
+    }
+
     return p;
 };
 
@@ -379,6 +411,11 @@ Browserify.prototype.deps = function (opts) {
     var index = 0;
     var tr = d.pipe(through(write));
     d.on('error', tr.emit.bind(tr, 'error'));
+
+    if (self._depTransforms.length > 0 || opts.depTransforms.length > 0) {
+      tr = applyTransforms(tr, [].concat(self._depTransforms).concat(opts.depTransforms));
+    }
+
     return tr;
     
     function write (row) {
@@ -675,11 +712,19 @@ Browserify.prototype._resolve = function (id, parent, cb) {
 function Workflow() {
   this._transforms = [];
   this._globalTransforms = [];
+  this._bundleTransforms = [];
+  this._depTransforms = [];
 }
 inherits(Workflow, EventEmitter);
 
 Workflow.prototype.transform = function (opts, t) {
     return Browserify.prototype.transform.call(this, opts, t);
+}
+Workflow.prototype.bundleTransform = function (t) {
+    return Browserify.prototype.bundleTransform.call(this, t);
+}
+Workflow.prototype.depTransform = function (t) {
+    return Browserify.prototype.depTransform.call(this, t);
 }
 
 Workflow.prototype.throw = function (err) {
@@ -703,4 +748,13 @@ function notFound (id, parent) {
     err.filename = id;
     err.parent = parent;
     return err;
+}
+
+function applyTransforms(stream, transforms, opts) {
+  return transforms.reduce(function(stream, transform) {
+    var transformer = transform(opts);
+    return stream
+      .on('error', transformer.emit.bind(transformer, 'error'))
+      .pipe(transformer);
+  }, stream);
 }
